@@ -1,3 +1,0 @@
-[submodule "rebound"]
-	path = rebound_pymc3/rebound
-	url = https://github.com/hannorein/rebound.git
