@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+import time
 import pytest
 import numpy as np
 
@@ -43,10 +44,10 @@ class TestIntegrate(utt.InferShapeTester):
             args, self.op(*(list(args) + [t])), arg_vals, self.op_class
         )
 
-    # def test_grad(self):
-    #     t, _, _, in_args = self.get_args()
-    #     func = lambda *args: self.op(*(list(args) + [t]))[0]  # NOQA
-    #     utt.verify_grad(func, in_args, n_tests=1)
+    def test_grad(self):
+        t, _, _, in_args = self.get_args()
+        func = lambda *args: self.op(*(list(args) + [t]))[0]  # NOQA
+        utt.verify_grad(func, in_args, n_tests=1)
 
 
 @pytest.mark.parametrize("kwargs", [dict(), dict(integrator="whfast")])
@@ -59,7 +60,37 @@ def test_consistent_results(kwargs):
     x[2, 4] = 0.2
     t = np.linspace(100, 1000, 12)
 
-    results1 = ReboundOp()(m, x, t)[0].eval()
-    results2 = IntegrateOp()(m, x, t)[0].eval()
+    v1, j1 = theano.function([], ReboundOp(**kwargs)(m, x, t))()
+    v2, j2 = theano.function([], IntegrateOp(**kwargs)(m, x, t))()
 
-    assert np.allclose(results1, results2)
+    assert np.allclose(v1, v2)
+    assert np.allclose(j1, j2)
+
+
+def test_performance(K=10):
+    m = np.array([1.3, 1e-3, 1e-5])
+    x = np.zeros((3, 6))
+    x[1, 0] = 15.0
+    x[1, 4] = 0.4
+    x[2, 0] = 100.0
+    x[2, 4] = 0.2
+    t_tensor = tt.dvector()
+    t = np.linspace(100, 1000, 100)
+
+    f1 = theano.function([t_tensor], ReboundOp()(m, x, t_tensor))
+    f2 = theano.function([t_tensor], IntegrateOp()(m, x, t_tensor))
+
+    f1(t)
+    f2(t)
+
+    strt = time.time()
+    for k in range(K):
+        f1(t)
+    time1 = time.time() - strt
+
+    strt = time.time()
+    for k in range(K):
+        f2(t)
+    time2 = time.time() - strt
+
+    assert time1 > time2

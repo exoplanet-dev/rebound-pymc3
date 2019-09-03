@@ -1,5 +1,3 @@
 include README.md
 include LICENSE
 include requirements.txt
-
-graft rebound_pymc3/lib/src

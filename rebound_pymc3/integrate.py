@@ -4,7 +4,6 @@ from __future__ import division, print_function
 
 __all__ = ["IntegrateOp"]
 
-import os
 import pkg_resources
 
 import numpy as np
@@ -17,7 +16,8 @@ from .build_utils import (
     get_compile_args,
     get_cache_version,
     get_header_dirs,
-    find_librebound,
+    get_librebound_path,
+    get_librebound_name,
 )
 
 
@@ -54,7 +54,7 @@ class IntegrateOp(gof.COp):
         return get_cache_version()
 
     def c_headers(self, compiler):
-        return ["theano_helpers.h", "rebound.h"]
+        return ["theano_helpers.h", "rebound.h", "vector", "array"]
 
     def c_header_dirs(self, compiler):
         return [
@@ -65,11 +65,10 @@ class IntegrateOp(gof.COp):
         return get_compile_args(compiler)
 
     def c_libraries(self, compiler):
-        lib = find_librebound()
-        return [os.path.splitext(os.path.split(lib)[1])[0][3:]]
+        return [get_librebound_name()]
 
     def c_lib_dirs(self, compiler):
-        return [os.path.dirname(find_librebound())]
+        return [get_librebound_path()]
 
     def make_node(self, masses, initial_coords, times):
         in_args = [
@@ -90,17 +89,20 @@ class IntegrateOp(gof.COp):
             list(shapes[2]) + list(shapes[0]) + [6] + list(shapes[0]) + [7],
         )
 
-    # def grad(self, inputs, gradients):
-    #     xi = inputs[0]
-    #     zi, dz = self(*inputs)
-    #     bz = gradients[0]
+    def grad(self, inputs, gradients):
+        masses, initial_coords, times = inputs
+        coords, jac = self(*inputs)
+        bcoords = gradients[0]
+        if not isinstance(gradients[1].type, theano.gradient.DisconnectedType):
+            raise ValueError(
+                "can't propagate gradients with respect to Jacobian"
+            )
 
-    #     bx = tt.sum(
-    #         tt.reshape(bz, (xi.shape[0], 1, zi.shape[1])) * dz, axis=-1
-    #     )
-    #     return tuple([bx] + [tt.zeros_like(i) for i in inputs[1:]])
+        # (time, num, 6) * (time, num, 6, num, 7) -> (num, 7)
+        grad = tt.sum(bcoords[:, :, :, None, None] * jac, axis=(0, 1, 2))
+        return grad[:, 0], grad[:, 1:], tt.zeros_like(times)
 
-    # def R_op(self, inputs, eval_points):
-    #     if eval_points[0] is None:
-    #         return eval_points
-    #     return self.grad(inputs, eval_points)
+    def R_op(self, inputs, eval_points):
+        if eval_points[0] is None:
+            return eval_points
+        return self.grad(inputs, eval_points)

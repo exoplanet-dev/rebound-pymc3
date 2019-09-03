@@ -4,7 +4,8 @@ __all__ = [
     "get_compile_args",
     "get_cache_version",
     "get_header_dirs",
-    "find_librebound",
+    "get_librebound_path",
+    "get_librebound_name",
 ]
 
 import os
@@ -44,7 +45,11 @@ def get_header_dirs():
     return [this_path, rebound_path]
 
 
-def find_librebound():
+def get_librebound_path():
+    return os.path.dirname(os.path.dirname(rebound.__file__))
+
+
+def get_librebound_name():
     suffix = sysconfig.get_config_var("EXT_SUFFIX")
     if suffix is None:
         suffix = ".so"
@@ -52,4 +57,4 @@ def find_librebound():
     path = os.path.join(path, "librebound" + suffix)
     if not os.path.exists(path):
         raise RuntimeError("can't find librebound")
-    return path
+    return "rebound" + os.path.splitext(suffix)[0]

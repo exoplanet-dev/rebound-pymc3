@@ -69,6 +69,8 @@ int APPLY_SPECIFIC(integrate)(
     return 1;
   }
 
+  std::vector<std::array<int, 7>> var_systems(nbody);
+
   for (npy_intp i = 0; i < nbody; ++i)
   {
     struct reb_particle body = {0.0};
@@ -81,6 +83,40 @@ int APPLY_SPECIFIC(integrate)(
     body.vy = double(initial_coords[ind + 4]);
     body.vz = double(initial_coords[ind + 5]);
     reb_add(sim, body);
+  }
+
+  for (npy_intp i = 0; i < nbody; ++i)
+  {
+    // Initialize the variational particles
+    int var;
+
+    var = reb_add_var_1st_order(sim, -1);
+    var_systems[i][0] = var;
+    sim->particles[var + i].m = 1.0;
+
+    var = reb_add_var_1st_order(sim, -1);
+    var_systems[i][1] = var;
+    sim->particles[var + i].x = 1.0;
+
+    var = reb_add_var_1st_order(sim, -1);
+    var_systems[i][2] = var;
+    sim->particles[var + i].y = 1.0;
+
+    var = reb_add_var_1st_order(sim, -1);
+    var_systems[i][3] = var;
+    sim->particles[var + i].z = 1.0;
+
+    var = reb_add_var_1st_order(sim, -1);
+    var_systems[i][4] = var;
+    sim->particles[var + i].vx = 1.0;
+
+    var = reb_add_var_1st_order(sim, -1);
+    var_systems[i][5] = var;
+    sim->particles[var + i].vy = 1.0;
+
+    var = reb_add_var_1st_order(sim, -1);
+    var_systems[i][6] = var;
+    sim->particles[var + i].vz = 1.0;
   }
 
   for (npy_intp t = 0; t < ntime; ++t)
@@ -97,6 +133,34 @@ int APPLY_SPECIFIC(integrate)(
       final_coords[ind + 3] = particle.vx;
       final_coords[ind + 4] = particle.vy;
       final_coords[ind + 5] = particle.vz;
+    }
+
+    for (npy_intp i = 0; i < nbody; ++i)
+    {
+
+      for (npy_intp k = 0; k < nbody; ++k)
+        for (npy_intp l = 0; l < 7; ++l)
+          jacobian[(((t * nbody + i) * 6 + 0) * nbody + k) * 7 + l] = sim->particles[var_systems[k][l] + i].x;
+
+      for (npy_intp k = 0; k < nbody; ++k)
+        for (npy_intp l = 0; l < 7; ++l)
+          jacobian[(((t * nbody + i) * 6 + 1) * nbody + k) * 7 + l] = sim->particles[var_systems[k][l] + i].y;
+
+      for (npy_intp k = 0; k < nbody; ++k)
+        for (npy_intp l = 0; l < 7; ++l)
+          jacobian[(((t * nbody + i) * 6 + 2) * nbody + k) * 7 + l] = sim->particles[var_systems[k][l] + i].z;
+
+      for (npy_intp k = 0; k < nbody; ++k)
+        for (npy_intp l = 0; l < 7; ++l)
+          jacobian[(((t * nbody + i) * 6 + 3) * nbody + k) * 7 + l] = sim->particles[var_systems[k][l] + i].vx;
+
+      for (npy_intp k = 0; k < nbody; ++k)
+        for (npy_intp l = 0; l < 7; ++l)
+          jacobian[(((t * nbody + i) * 6 + 4) * nbody + k) * 7 + l] = sim->particles[var_systems[k][l] + i].vy;
+
+      for (npy_intp k = 0; k < nbody; ++k)
+        for (npy_intp l = 0; l < 7; ++l)
+          jacobian[(((t * nbody + i) * 6 + 5) * nbody + k) * 7 + l] = sim->particles[var_systems[k][l] + i].vz;
     }
   }
 
