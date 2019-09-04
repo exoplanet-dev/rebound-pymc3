@@ -27,12 +27,18 @@ int APPLY_SPECIFIC(integrate)(
   npy_intp final_shape[] = {ntime, nbody, 6};
   auto final_coords = allocate_output<DTYPE_OUTPUT_0>(3, final_shape, TYPENUM_OUTPUT_0, output_coords, &success);
 
-  npy_intp jac_shape[] = {ntime, nbody, 6, nbody, 7};
+  npy_intp jac_shape[] = {ntime, nbody, 7, nbody, 6};
   auto jacobian = allocate_output<DTYPE_OUTPUT_1>(5, jac_shape, TYPENUM_OUTPUT_1, output_jacobian, &success);
 
   if (success)
     return 1;
 
+  // Argsort the times for efficiency
+  std::vector<npy_intp> idx(ntime);
+  std::iota(idx.begin(), idx.end(), 0);
+  std::sort(idx.begin(), idx.end(), [&times](npy_intp i1, npy_intp i2) { return times[i1] < times[i2]; });
+
+  // Set up the simulation
   struct reb_simulation *sim = reb_create_simulation();
   sim->t = params->t;
   sim->dt = params->dt;
@@ -65,7 +71,6 @@ int APPLY_SPECIFIC(integrate)(
   default:
     PyErr_Format(PyExc_ValueError, "unknown integrator");
     reb_free_simulation(sim);
-
     return 1;
   }
 
@@ -119,8 +124,10 @@ int APPLY_SPECIFIC(integrate)(
     sim->particles[var + i].vz = 1.0;
   }
 
-  for (npy_intp t = 0; t < ntime; ++t)
+  for (npy_intp ind = 0; ind < ntime; ++ind)
   {
+    npy_intp t = idx[ind];
+
     reb_integrate(sim, times[t]);
 
     for (npy_intp i = 0; i < nbody; ++i)
@@ -135,32 +142,23 @@ int APPLY_SPECIFIC(integrate)(
       final_coords[ind + 5] = particle.vz;
     }
 
+    // [ntime, nbody, 7, nbody, 6]
     for (npy_intp i = 0; i < nbody; ++i)
     {
-
-      for (npy_intp k = 0; k < nbody; ++k)
-        for (npy_intp l = 0; l < 7; ++l)
-          jacobian[(((t * nbody + i) * 6 + 0) * nbody + k) * 7 + l] = sim->particles[var_systems[k][l] + i].x;
-
-      for (npy_intp k = 0; k < nbody; ++k)
-        for (npy_intp l = 0; l < 7; ++l)
-          jacobian[(((t * nbody + i) * 6 + 1) * nbody + k) * 7 + l] = sim->particles[var_systems[k][l] + i].y;
-
-      for (npy_intp k = 0; k < nbody; ++k)
-        for (npy_intp l = 0; l < 7; ++l)
-          jacobian[(((t * nbody + i) * 6 + 2) * nbody + k) * 7 + l] = sim->particles[var_systems[k][l] + i].z;
-
-      for (npy_intp k = 0; k < nbody; ++k)
-        for (npy_intp l = 0; l < 7; ++l)
-          jacobian[(((t * nbody + i) * 6 + 3) * nbody + k) * 7 + l] = sim->particles[var_systems[k][l] + i].vx;
-
-      for (npy_intp k = 0; k < nbody; ++k)
-        for (npy_intp l = 0; l < 7; ++l)
-          jacobian[(((t * nbody + i) * 6 + 4) * nbody + k) * 7 + l] = sim->particles[var_systems[k][l] + i].vy;
-
-      for (npy_intp k = 0; k < nbody; ++k)
-        for (npy_intp l = 0; l < 7; ++l)
-          jacobian[(((t * nbody + i) * 6 + 5) * nbody + k) * 7 + l] = sim->particles[var_systems[k][l] + i].vz;
+      for (npy_intp j = 0; j < 7; ++j)
+      {
+        for (npy_intp k = 0; k < nbody; ++k)
+        {
+          int ind = (((t * nbody + i) * 7 + j) * nbody + k) * 6;
+          struct reb_particle particle = sim->particles[var_systems[i][j] + k];
+          jacobian[ind + 0] = particle.x;
+          jacobian[ind + 1] = particle.y;
+          jacobian[ind + 2] = particle.z;
+          jacobian[ind + 3] = particle.vx;
+          jacobian[ind + 4] = particle.vy;
+          jacobian[ind + 5] = particle.vz;
+        }
+      }
     }
   }
 

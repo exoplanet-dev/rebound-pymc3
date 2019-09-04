@@ -62,6 +62,8 @@ def test_consistent_results(kwargs):
 
     v1, j1 = theano.function([], ReboundOp(**kwargs)(m, x, t))()
     v2, j2 = theano.function([], IntegrateOp(**kwargs)(m, x, t))()
+    j1 = np.moveaxis(j1, -1, 1)
+    j1 = np.moveaxis(j1, -1, 1)
 
     assert np.allclose(v1, v2)
     assert np.allclose(j1, j2)

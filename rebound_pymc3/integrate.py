@@ -54,7 +54,14 @@ class IntegrateOp(gof.COp):
         return get_cache_version()
 
     def c_headers(self, compiler):
-        return ["theano_helpers.h", "rebound.h", "vector", "array"]
+        return [
+            "theano_helpers.h",
+            "rebound.h",
+            "vector",
+            "array",
+            "numeric",
+            "algorithm",
+        ]
 
     def c_header_dirs(self, compiler):
         return [
@@ -86,7 +93,7 @@ class IntegrateOp(gof.COp):
     def infer_shape(self, node, shapes):
         return (
             list(shapes[2]) + list(shapes[0]) + [6],
-            list(shapes[2]) + list(shapes[0]) + [6] + list(shapes[0]) + [7],
+            list(shapes[2]) + list(shapes[0]) + [7] + list(shapes[0]) + [6],
         )
 
     def grad(self, inputs, gradients):
@@ -98,8 +105,8 @@ class IntegrateOp(gof.COp):
                 "can't propagate gradients with respect to Jacobian"
             )
 
-        # (time, num, 6) * (time, num, 6, num, 7) -> (num, 7)
-        grad = tt.sum(bcoords[:, :, :, None, None] * jac, axis=(0, 1, 2))
+        # (time, num, 6) * (time, num, 7, num, 6) -> (num, 7)
+        grad = tt.sum(bcoords[:, None, None, :, :] * jac, axis=(0, 3, 4))
         return grad[:, 0], grad[:, 1:], tt.zeros_like(times)
 
     def R_op(self, inputs, eval_points):
