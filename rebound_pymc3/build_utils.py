@@ -19,7 +19,8 @@ from .rebound_pymc3_version import __version__
 
 
 def get_compile_args(compiler):
-    opts = ["-std=c++11", "-O2", "-DNDEBUG"]
+    libpath = get_librebound_path()
+    opts = ["-std=c++11", "-O2", "-DNDEBUG", "-Wl,-rpath={0}".format(libpath)]
     if sys.platform == "darwin":
         opts += ["-stdlib=libc++", "-mmacosx-version-min=10.7"]
     return opts
