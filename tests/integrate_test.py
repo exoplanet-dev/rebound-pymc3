@@ -3,18 +3,18 @@
 import time
 import pytest
 import numpy as np
+from exoplanet.theano_ops.test_tools import InferShapeTester
 
-import theano
-import theano.tensor as tt
-from theano.tests import unittest_tools as utt
+from aesara_theano_fallback import aesara
+from aesara_theano_fallback import tensor as aet
 
-from .python_impl import ReboundOp
-from .integrate import IntegrateOp
+from rebound_pymc3.python_impl import ReboundOp
+from rebound_pymc3.integrate import IntegrateOp
 
 
-class TestIntegrate(utt.InferShapeTester):
-    def setUp(self):
-        super(TestIntegrate, self).setUp()
+class TestIntegrate(InferShapeTester):
+    def __init__(self):
+        super().__init__()
         self.op_class = IntegrateOp
         self.op = IntegrateOp()
 
@@ -27,10 +27,10 @@ class TestIntegrate(utt.InferShapeTester):
         x_val[2, 4] = 0.2
         t = np.linspace(100, 1000, 12)
 
-        m = tt.dvector()
-        x = tt.dmatrix()
+        m = aet.dvector()
+        x = aet.dmatrix()
 
-        f = theano.function([m, x], self.op(m, x, t)[0])
+        f = aesara.function([m, x], self.op(m, x, t)[0])
 
         return t, f, [m, x], [m_val, x_val]
 
@@ -47,7 +47,7 @@ class TestIntegrate(utt.InferShapeTester):
     def test_grad(self):
         t, _, _, in_args = self.get_args()
         func = lambda *args: self.op(*(list(args) + [t]))[0]  # NOQA
-        utt.verify_grad(func, in_args, n_tests=1)
+        aesara.gradient.verify_grad(func, in_args, n_tests=1, rng=np.random)
 
 
 @pytest.mark.parametrize("kwargs", [dict(), dict(integrator="whfast")])
@@ -60,8 +60,8 @@ def test_consistent_results(kwargs):
     x[2, 4] = 0.2
     t = np.linspace(100, 1000, 12)
 
-    v1, j1 = theano.function([], ReboundOp(**kwargs)(m, x, t))()
-    v2, j2 = theano.function([], IntegrateOp(**kwargs)(m, x, t))()
+    v1, j1 = aesara.function([], ReboundOp(**kwargs)(m, x, t))()
+    v2, j2 = aesara.function([], IntegrateOp(**kwargs)(m, x, t))()
     j1 = np.moveaxis(j1, -1, 1)
     j1 = np.moveaxis(j1, -1, 1)
 
@@ -76,11 +76,11 @@ def test_performance(K=10):
     x[1, 4] = 0.4
     x[2, 0] = 100.0
     x[2, 4] = 0.2
-    t_tensor = tt.dvector()
+    t_tensor = aet.dvector()
     t = np.linspace(100, 1000, 100)
 
-    f1 = theano.function([t_tensor], ReboundOp()(m, x, t_tensor))
-    f2 = theano.function([t_tensor], IntegrateOp()(m, x, t_tensor))
+    f1 = aesara.function([t_tensor], ReboundOp()(m, x, t_tensor))
+    f2 = aesara.function([t_tensor], IntegrateOp()(m, x, t_tensor))
 
     f1(t)
     f2(t)

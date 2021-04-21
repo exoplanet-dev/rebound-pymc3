@@ -8,9 +8,9 @@ import pkg_resources
 
 import numpy as np
 
-import theano
-from theano import gof
-import theano.tensor as tt
+from aesara_theano_fallback import aesara
+from aesara_theano_fallback.graph import basic, op, params_type
+from aesara_theano_fallback import tensor as aet
 
 from .build_utils import (
     get_compile_args,
@@ -21,11 +21,11 @@ from .build_utils import (
 )
 
 
-class IntegrateOp(gof.COp):
-    params_type = gof.ParamsType(
-        t=theano.scalar.float64,
-        dt=theano.scalar.float64,
-        integrator=theano.scalar.int32,
+class IntegrateOp(op.ExternalCOp):
+    params_type = params_type.ParamsType(
+        t=aesara.scalar.float64,
+        dt=aesara.scalar.float64,
+        integrator=aesara.scalar.int32,
     )
     __props__ = ("t", "dt", "integrator")
     func_file = "./integrate.cc"
@@ -47,13 +47,12 @@ class IntegrateOp(gof.COp):
         if self.integrator is None:
             raise ValueError("unknown integrator {0}".format(integrator))
         self.integrator = np.int32(self.integrator)
-
-        super(IntegrateOp, self).__init__(self.func_file, self.func_name)
+        super().__init__(self.func_file, self.func_name)
 
     def c_code_cache_version(self):
         return get_cache_version()
 
-    def c_headers(self, compiler):
+    def c_headers(self, c_compiler):
         return [
             "theano_helpers.h",
             "rebound.h",
@@ -63,34 +62,38 @@ class IntegrateOp(gof.COp):
             "algorithm",
         ]
 
-    def c_header_dirs(self, compiler):
+    def c_header_dirs(self, c_compiler):
         return [
             pkg_resources.resource_filename(__name__, "")
         ] + get_header_dirs()
 
-    def c_compile_args(self, compiler):
-        return get_compile_args(compiler)
+    def c_compile_args(self, c_compiler):
+        return get_compile_args(c_compiler)
 
-    def c_libraries(self, compiler):
+    def c_libraries(self, c_compiler):
         return [get_librebound_name()]
 
-    def c_lib_dirs(self, compiler):
+    def c_lib_dirs(self, c_compiler):
         return [get_librebound_path()]
+
+    def perform(self, node, inputs, outputs):
+        assert 0
 
     def make_node(self, masses, initial_coords, times):
         in_args = [
-            tt.as_tensor_variable(masses),
-            tt.as_tensor_variable(initial_coords),
-            tt.as_tensor_variable(times),
+            aet.as_tensor_variable(masses),
+            aet.as_tensor_variable(initial_coords),
+            aet.as_tensor_variable(times),
         ]
-        dtype = theano.config.floatX
+        dtype = in_args[0].dtype
         out_args = [
-            tt.TensorType(dtype=dtype, broadcastable=[False] * 3)(),
-            tt.TensorType(dtype=dtype, broadcastable=[False] * 5)(),
+            aet.TensorType(dtype=dtype, broadcastable=[False] * 3)(),
+            aet.TensorType(dtype=dtype, broadcastable=[False] * 5)(),
         ]
-        return gof.Apply(self, in_args, out_args)
+        return basic.Apply(self, in_args, out_args)
 
-    def infer_shape(self, node, shapes):
+    def infer_shape(self, *args):
+        shapes = args[-1]
         return (
             list(shapes[2]) + list(shapes[0]) + [6],
             list(shapes[2]) + list(shapes[0]) + [7] + list(shapes[0]) + [6],
@@ -100,14 +103,14 @@ class IntegrateOp(gof.COp):
         masses, initial_coords, times = inputs
         coords, jac = self(*inputs)
         bcoords = gradients[0]
-        if not isinstance(gradients[1].type, theano.gradient.DisconnectedType):
+        if not isinstance(gradients[1].type, aesara.gradient.DisconnectedType):
             raise ValueError(
                 "can't propagate gradients with respect to Jacobian"
             )
 
         # (time, num, 6) * (time, num, 7, num, 6) -> (num, 7)
-        grad = tt.sum(bcoords[:, None, None, :, :] * jac, axis=(0, 3, 4))
-        return grad[:, 0], grad[:, 1:], tt.zeros_like(times)
+        grad = aet.sum(bcoords[:, None, None, :, :] * jac, axis=(0, 3, 4))
+        return grad[:, 0], grad[:, 1:], aet.zeros_like(times)
 
     def R_op(self, inputs, eval_points):
         if eval_points[0] is None:

@@ -3,14 +3,10 @@
 __all__ = ["ReboundOrbit"]
 
 import aesara_theano_fallback.tensor as tt
+from exoplanet.orbits.constants import au_per_R_sun, day_per_yr_over_2pi
+from exoplanet.oribts.keplerian import KeplerianOrbit
 
-from .constants import au_per_R_sun, day_per_yr_over_2pi
-from .keplerian import KeplerianOrbit
-
-try:
-    from rebound_pymc3.integrate import IntegrateOp as ReboundOp
-except ImportError:
-    from ..theano_ops.rebound import ReboundOp
+from .integrate import IntegrateOp as ReboundOp
 
 
 class ReboundOrbit(KeplerianOrbit):
