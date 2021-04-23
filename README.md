@@ -8,7 +8,11 @@
 
 # rebound-pymc3
 
-Interfacing rebound and pymc3
+An [exoplanet](https://docs.exoplanet.codes)-friendly interface between
+[REBOUND](https://rebound.readthedocs.io),
+[REBOUNDx](https://reboundx.readthedocs.io), and [PyMC3](https://docs.pymc.io).
+This library provides a set of custom `Theano`/`aesara` "ops" for evaluating and
+differentiating N-body orbits within a PyMC3 model.
 
 ## Installation
 
@@ -20,3 +24,5 @@ python -m pip install rebound-pymc3
 
 ## Usage
 
+Coming soon. For now, take a look at the tests in the `tests` directory for some
+ideas.
