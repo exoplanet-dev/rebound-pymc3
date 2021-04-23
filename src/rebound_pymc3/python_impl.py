@@ -4,12 +4,12 @@ __all__ = ["ReboundOp"]
 
 import numpy as np
 
-import theano
-from theano import gof
-import theano.tensor as tt
+from aesara_theano_fallback import aesara
+from aesara_theano_fallback.graph import basic, op
+from aesara_theano_fallback import tensor as aet
 
 
-class ReboundOp(gof.Op):
+class ReboundOp(op.Op):
 
     __props__ = ()
 
@@ -19,18 +19,19 @@ class ReboundOp(gof.Op):
 
     def make_node(self, masses, initial_coords, times):
         in_args = [
-            tt.as_tensor_variable(masses),
-            tt.as_tensor_variable(initial_coords),
-            tt.as_tensor_variable(times),
+            aet.as_tensor_variable(masses),
+            aet.as_tensor_variable(initial_coords),
+            aet.as_tensor_variable(times),
         ]
-        dtype = theano.config.floatX
+        dtype = aesara.config.floatX
         out_args = [
-            tt.TensorType(dtype=dtype, broadcastable=[False] * 3)(),
-            tt.TensorType(dtype=dtype, broadcastable=[False] * 5)(),
+            aet.TensorType(dtype=dtype, broadcastable=[False] * 3)(),
+            aet.TensorType(dtype=dtype, broadcastable=[False] * 5)(),
         ]
-        return gof.Apply(self, in_args, out_args)
+        return basic.Apply(self, in_args, out_args)
 
-    def infer_shape(self, node, shapes):
+    def infer_shape(self, *args):
+        shapes = args[-1]
         return (
             list(shapes[2]) + list(shapes[0]) + [6],
             list(shapes[2]) + list(shapes[0]) + [6] + list(shapes[0]) + [7],
@@ -64,9 +65,17 @@ class ReboundOp(gof.Op):
 
         # Set up the simulation
         sim = rebound.Simulation()
-
+        gr_sources = []
         for k, v in self.rebound_args.items():
+            if k.startswith("gr_") and k != "gr_force":
+                gr_sources += [v]
+                continue
             setattr(sim, k, v)
+
+        if "gr_force" in self.rebound_args.keys():
+            force = self.rebound_args["gr_force"]
+        else:
+            force = "gr"  # default to the gr force
 
         for i in range(num_bodies):
             sim.add(
@@ -79,6 +88,22 @@ class ReboundOp(gof.Op):
                 vz=initial_coords[i, 5],
             )
 
+        ps = sim.particles
+
+        if len(gr_sources):
+            try:
+                import reboundx
+                from reboundx import constants
+            except ImportError:
+                raise ImportError(
+                    "Please install REBOUNDx to include relativistic effects."
+                )
+            rebx = reboundx.Extras(sim)
+            gr = rebx.load_force(force)
+            gr.params["c"] = constants.C
+            for i, particle in enumerate(ps):
+                particle.params["gr_source"] = gr_sources[i]
+            rebx.add_force(gr)
         # Add the variational particles to track the derivatives
         var_systems = np.empty((num_bodies, 7), dtype=object)
         for i in range(num_bodies):
@@ -102,31 +127,27 @@ class ReboundOp(gof.Op):
             for i in range(num_bodies):
                 for j, coord in enumerate("x y z vx vy vz".split()):
                     for k in range(num_bodies):
-                        for l in range(7):
-                            jac[ind, i, j, k, l] = getattr(
-                                var_systems[k, l].particles[i], coord
+                        for ell in range(7):
+                            jac[ind, i, j, k, ell] = getattr(
+                                var_systems[k, ell].particles[i], coord
                             )
 
         # Save the results
         outputs[0][0] = np.ascontiguousarray(coords[time_inds])
         outputs[1][0] = np.ascontiguousarray(jac[time_inds])
-        # outputs[0][0] = np.ascontiguousarray(
-        #     np.moveaxis(coords[time_inds], 2, 0)
-        # )
-        # outputs[1][0] = np.ascontiguousarray(np.moveaxis(jac[time_inds], 2, 0))
 
     def grad(self, inputs, gradients):
         masses, initial_coords, times = inputs
         coords, jac = self(*inputs)
         bcoords = gradients[0]
-        if not isinstance(gradients[1].type, theano.gradient.DisconnectedType):
+        if not isinstance(gradients[1].type, aesara.gradient.DisconnectedType):
             raise ValueError(
                 "can't propagate gradients with respect to Jacobian"
             )
 
-        # (time, num, 6) * (time, num, 6, num, 7) -> (num, 7)
-        grad = tt.sum(bcoords[:, :, :, None, None] * jac, axis=(0, 1, 2))
-        return grad[:, 0], grad[:, 1:], tt.zeros_like(times)
+        # (6, time, num) * (6, time, num, num, 7) -> (num, 7)
+        grad = aet.sum(bcoords[:, :, :, None, None] * jac, axis=(0, 1, 2))
+        return grad[:, 0], grad[:, 1:], aet.zeros_like(times)
 
     def R_op(self, inputs, eval_points):
         if eval_points[0] is None:

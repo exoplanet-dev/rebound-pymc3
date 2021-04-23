@@ -1,6 +1,4 @@
-include README.md
-include LICENSE
-include requirements.txt
+include README.md LICENSE *.rst *.toml *.yml *.yaml
 
-include rebound_pymc3/*.cc
-include rebound_pymc3/*.h
+recursive-include src *.cc
+recursive-include src *.h

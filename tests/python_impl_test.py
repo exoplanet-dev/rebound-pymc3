@@ -2,16 +2,16 @@
 
 import numpy as np
 
-import theano
-import theano.tensor as tt
-from theano.tests import unittest_tools as utt
+from aesara_theano_fallback import aesara
+from aesara_theano_fallback import tensor as aet
 
-from .python_impl import ReboundOp
+from rebound_pymc3.test_tools import InferShapeTester
+from rebound_pymc3.python_impl import ReboundOp
 
 
-class TestRebound(utt.InferShapeTester):
-    def setUp(self):
-        super(TestRebound, self).setUp()
+class TestRebound(InferShapeTester):
+    def setup_method(self):
+        super().setup_method()
         self.op_class = ReboundOp
         self.op = ReboundOp()
 
@@ -24,10 +24,10 @@ class TestRebound(utt.InferShapeTester):
         x_val[2, 4] = 0.2
         t = np.linspace(100, 1000, 12)
 
-        m = tt.dvector()
-        x = tt.dmatrix()
+        m = aet.dvector()
+        x = aet.dmatrix()
 
-        f = theano.function([m, x], self.op(m, x, t)[0])
+        f = aesara.function([m, x], self.op(m, x, t)[0])
 
         return t, f, [m, x], [m_val, x_val]
 
@@ -44,4 +44,4 @@ class TestRebound(utt.InferShapeTester):
     def test_grad(self):
         t, _, _, in_args = self.get_args()
         func = lambda *args: self.op(*(list(args) + [t]))[0]  # NOQA
-        utt.verify_grad(func, in_args, n_tests=1)
+        aesara.gradient.verify_grad(func, in_args, n_tests=1, rng=np.random)
