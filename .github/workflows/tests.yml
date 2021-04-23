@@ -37,6 +37,7 @@ jobs:
           python -m pip install -U pip
           python -m pip install ${{ matrix.pymc-arviz }}
           python -m pip install -e .
+          python -m pip install reboundx pytest
 
       - name: Get compiledir
         id: compiledir
