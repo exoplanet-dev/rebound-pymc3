@@ -1,4 +1,0 @@
-include README.md LICENSE *.rst *.toml *.yml *.yaml
-
-recursive-include src *.cc
-recursive-include src *.h
