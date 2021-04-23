@@ -4,7 +4,7 @@ __all__ = ["ReboundOrbit"]
 
 import aesara_theano_fallback.tensor as tt
 from exoplanet.orbits.constants import au_per_R_sun, day_per_yr_over_2pi
-from exoplanet.oribts.keplerian import KeplerianOrbit
+from exoplanet.orbits.keplerian import KeplerianOrbit
 
 from .integrate import IntegrateOp as ReboundOp
 

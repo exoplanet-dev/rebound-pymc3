@@ -23,7 +23,7 @@ class ReboundOp(op.Op):
             aet.as_tensor_variable(initial_coords),
             aet.as_tensor_variable(times),
         ]
-        dtype = in_args[0].dtype
+        dtype = aesara.config.floatX
         out_args = [
             aet.TensorType(dtype=dtype, broadcastable=[False] * 3)(),
             aet.TensorType(dtype=dtype, broadcastable=[False] * 5)(),
@@ -65,9 +65,17 @@ class ReboundOp(op.Op):
 
         # Set up the simulation
         sim = rebound.Simulation()
-
+        gr_sources = []
         for k, v in self.rebound_args.items():
+            if k.startswith("gr_") and k != "gr_force":
+                gr_sources += [v]
+                continue
             setattr(sim, k, v)
+
+        if "gr_force" in self.rebound_args.keys():
+            force = self.rebound_args["gr_force"]
+        else:
+            force = "gr"  # default to the gr force
 
         for i in range(num_bodies):
             sim.add(
@@ -80,6 +88,22 @@ class ReboundOp(op.Op):
                 vz=initial_coords[i, 5],
             )
 
+        ps = sim.particles
+
+        if len(gr_sources):
+            try:
+                import reboundx
+                from reboundx import constants
+            except ImportError:
+                raise ImportError(
+                    "Please install REBOUNDx to include relativistic effects."
+                )
+            rebx = reboundx.Extras(sim)
+            gr = rebx.load_force(force)
+            gr.params["c"] = constants.C
+            for i, particle in enumerate(ps):
+                particle.params["gr_source"] = gr_sources[i]
+            rebx.add_force(gr)
         # Add the variational particles to track the derivatives
         var_systems = np.empty((num_bodies, 7), dtype=object)
         for i in range(num_bodies):
@@ -121,7 +145,7 @@ class ReboundOp(op.Op):
                 "can't propagate gradients with respect to Jacobian"
             )
 
-        # (time, num, 6) * (time, num, 6, num, 7) -> (num, 7)
+        # (6, time, num) * (6, time, num, num, 7) -> (num, 7)
         grad = aet.sum(bcoords[:, :, :, None, None] * jac, axis=(0, 1, 2))
         return grad[:, 0], grad[:, 1:], aet.zeros_like(times)
 

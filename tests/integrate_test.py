@@ -3,18 +3,18 @@
 import time
 import pytest
 import numpy as np
-from exoplanet.theano_ops.test_tools import InferShapeTester
 
 from aesara_theano_fallback import aesara
 from aesara_theano_fallback import tensor as aet
 
+from rebound_pymc3.test_tools import InferShapeTester
 from rebound_pymc3.python_impl import ReboundOp
 from rebound_pymc3.integrate import IntegrateOp
 
 
 class TestIntegrate(InferShapeTester):
-    def __init__(self):
-        super().__init__()
+    def setup_method(self):
+        super().setup_method()
         self.op_class = IntegrateOp
         self.op = IntegrateOp()
 
