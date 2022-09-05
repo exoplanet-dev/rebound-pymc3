@@ -68,6 +68,8 @@ def test_keplerian(orbit):
 
 
 def test_gr_orbit_low_mass_limit():
+    pytest.importorskip("reboundx")
+
     from rebound_pymc3.python_impl import ReboundOp as test_rebound_op
 
     t = np.linspace(0, 40, 200)
@@ -106,6 +108,8 @@ def test_gr_orbit_low_mass_limit():
 
 
 def test_gr_orbit_high_mass_limit():
+    pytest.importorskip("reboundx")
+
     from rebound_pymc3.python_impl import ReboundOp as test_rebound_op
 
     t = np.linspace(0, 40, 200)

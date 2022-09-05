@@ -3,6 +3,14 @@
 
 #include <cmath>
 
+#if defined(__GNUC__) || defined(__clang__)
+#define restrict __restrict__
+#endif
+
+extern "C" {
+#include "rebound.h"
+}
+
 namespace rebound_pymc3
 {
 
