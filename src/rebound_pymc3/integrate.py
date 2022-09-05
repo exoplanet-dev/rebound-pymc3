@@ -55,7 +55,6 @@ class IntegrateOp(op.ExternalCOp):
     def c_headers(self, c_compiler):
         return [
             "theano_helpers.h",
-            "rebound.h",
             "vector",
             "array",
             "numeric",
