@@ -23,7 +23,7 @@ CLASSIFIERS = [
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
 ]
-INSTALL_REQUIRES = ["exoplanet>=0.4.5", "rebound"]
+INSTALL_REQUIRES = ["exoplanet>=0.4.5", "rebound", "numpy<1.22"]
 
 # END PROJECT SPECIFIC
 
